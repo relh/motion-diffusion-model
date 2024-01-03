@@ -4,7 +4,7 @@ from data_loaders.tensors import t2m_collate
 
 def get_dataset_class(name):
     if name == "arctic":
-        from .arctic_mdm import ARCTIC_MDM 
+        from .a2m.arctic_mdm import ARCTIC_MDM 
         return ARCTIC_MDM 
     elif name == "amass":
         from .amass import AMASS

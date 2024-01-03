@@ -32,6 +32,7 @@ class HumanAct12Poses(Dataset):
         self._label_to_action = {i: x for i, x in enumerate(keep_actions)}
 
         self._action_classes = humanact12_coarse_action_enumerator
+        breakpoint()
 
     def _load_joints3D(self, ind, frame_ix):
         return self._joints[ind][frame_ix]
