@@ -36,11 +36,22 @@ class ARCTIC_MDM(Dataset):
         tensordatafilepath = os.path.join(datapath, "arctic_mdm.pt")
         data = torch.load(tensordatafilepath) 
 
-        self._pose = [x for x in data["_pose"]]
+        self._pose = [x for x in data["_joints"]] #data["_pose"]]
         self._num_frames_in_video = [x for x in data["_num_frames_in_video"]]
         self._joints = [x for x in data["_joints"]]
 
         self._train = list(range(len(self._pose)))
+
+        self.num_actions = 2
+        self._actions = [0, 1] * (len(self._pose) // 2)
+
+        total_num_actions = 2
+        keep_actions = np.arange(0, total_num_actions)
+
+        self._action_to_label = {x: i for i, x in enumerate(keep_actions)}
+        self._label_to_action = {i: x for i, x in enumerate(keep_actions)}
+
+        self._action_classes = {0: 'right', 1: 'left'} 
 
     def _load_joints3D(self, ind, frame_ix):
         return self._joints[ind][frame_ix]
@@ -218,15 +229,14 @@ def calculate_angular_velocity(poses, time_step=1):
 
 
 def build_mdm():
-    train_ds = ARCTIC_MDM(args=None, split='train')
+    train_ds = ARCTIC(args=None, split='train')
 
     a_joints = []
     a_pose = []
     a_num_frames_in_video = []
-    for x in range(0, len(train_ds), 2): 
+    for x in range(0, len(train_ds)): 
         print(x)
         returner = train_ds[x]
-        print(returner['obj']['j_pos'].shape)
         _joints = torch.cat([returner['right']['j_pos'],\
                              returner['left']['j_pos'],\
                              returner['obj']['j_pos']], dim=1)
@@ -246,4 +256,5 @@ def build_mdm():
 
 
 if __name__ == "__main__":
+    #build_mdm()
     train_ds = ARCTIC_MDM(args=None, split='train')
