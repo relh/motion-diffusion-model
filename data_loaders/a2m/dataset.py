@@ -8,7 +8,7 @@ from utils.misc import to_torch
 import utils.rotation_conversions as geometry
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, num_frames=1, sampling="conseq", sampling_step=1, split="train",
+    def __init__(self, num_frames=-1, sampling="conseq", sampling_step=1, split="train",
                  pose_rep="rot6d", translation=True, glob=True, max_len=-1, min_len=-1, num_seq_max=-1, **kwargs):
         self.num_frames = num_frames
         self.sampling = sampling

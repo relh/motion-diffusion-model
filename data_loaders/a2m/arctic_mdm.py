@@ -1,8 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import annotations
+
 import os
 import sys
+sys.path.append('/home/relh/Code/hand_trajectories/third_party/motion-diffusion-model/')  # Replace with the actual path to 'motion-diffusion-model'
 
 import cv2
 import numpy as np
@@ -12,9 +15,9 @@ import torch.utils.data
 import torchvision.transforms as transforms
 from einops import rearrange
 from PIL import Image
-from pytorch3d.transforms import axis_angle_to_matrix, matrix_to_rotation_6d, rotation_6d_to_matrix, matrix_to_axis_angle
+from pytorch3d.transforms import (axis_angle_to_matrix, matrix_to_axis_angle,
+                                  matrix_to_rotation_6d, rotation_6d_to_matrix)
 from torchvision import transforms
-
 
 if __name__ == "__main__":
     # Running as a script
@@ -34,7 +37,7 @@ class ARCTIC_MDM(Dataset):
         super().__init__(**kargs)
 
         tensordatafilepath = os.path.join(datapath, "arctic_mdm.pt")
-        data = torch.load(tensordatafilepath) 
+        data = torch.load(tensordatafilepath)
 
         self._pose = [x for x in data["_joints"]] #data["_pose"]]
         self._num_frames_in_video = [x for x in data["_num_frames_in_video"]]
@@ -51,7 +54,9 @@ class ARCTIC_MDM(Dataset):
         self._action_to_label = {x: i for i, x in enumerate(keep_actions)}
         self._label_to_action = {i: x for i, x in enumerate(keep_actions)}
 
-        self._action_classes = {0: 'right', 1: 'left'} 
+        self._action_classes = {0: 'right', 1: 'left'}
+
+        self.pose_rep = 'xyz'
 
     def _load_joints3D(self, ind, frame_ix):
         return self._joints[ind][frame_ix]
@@ -84,8 +89,8 @@ class ARCTIC(Dataset):
 
         # data points are either left or right hand at origin
         # augment is add a small amount of translation noise to everything
-        os.makedirs('/home/relh/Code/hand_trajectories/cache/processed_input/', exist_ok=True) 
-        os.makedirs('/home/relh/Code/hand_trajectories/cache/processed_batch/', exist_ok=True) 
+        os.makedirs('/home/relh/Code/hand_trajectories/cache/processed_input/', exist_ok=True)
+        os.makedirs('/home/relh/Code/hand_trajectories/cache/processed_batch/', exist_ok=True)
 
 
     def __getitem__(self, index):
@@ -93,7 +98,7 @@ class ARCTIC(Dataset):
         dominant_hand = 'right' if index % 2 == 0 else 'left'
 
         if os.path.exists(cache_name):
-            returner = torch.load(cache_name) 
+            returner = torch.load(cache_name)
         else:
             # trajectory details
             data, misc = self.dataset[index // 2]
@@ -115,11 +120,11 @@ class ARCTIC(Dataset):
             returner = {'obj': obj, 'right': right, 'left': left, 'cond': cond_signal}
             torch.save(returner, cache_name)
 
-        # need to match MDM format 
+        # need to match MDM format
         return returner
 
     def __len__(self):
-        return len(self.dataset) * 2 
+        return len(self.dataset) * 2
 
 
 def build_conditioning_signal(data, hand='right'):
@@ -177,11 +182,11 @@ def process_hand_data(data, hand='right', time_step=1):
     rotation_matrices = axis_angle_to_matrix(poses.view(-1, 3)).view(-1, 16, 3, 3)
     rotation_6d = matrix_to_rotation_6d(rotation_matrices.view(-1, 3, 3)).view(-1, 16, 6)
 
-    # pad 16 joints to 21 
+    # pad 16 joints to 21
     full_rotation_6d = torch.cat([rotation_6d, torch.zeros(rotation_6d.shape[0], 5, 6)], dim=1)
 
     # calc joint velocities and angular velocities
-    joint_velocities = joint_positions[1:] - joint_positions[:-1] 
+    joint_velocities = joint_positions[1:] - joint_positions[:-1]
     angular_velocities = calculate_angular_velocity(poses, time_step)
 
     # get global translation and velocity
@@ -201,7 +206,7 @@ def process_hand_data(data, hand='right', time_step=1):
 def calculate_angular_velocity(poses, time_step=1):
     """
     Calculate angular velocities from axis-angle representations.
-    
+
     Args:
     poses (Tensor): A tensor of shape (frames, joints, 3) representing axis-angle rotations.
     time_step (float): The time interval between frames.
@@ -234,7 +239,7 @@ def build_mdm():
     a_joints = []
     a_pose = []
     a_num_frames_in_video = []
-    for x in range(0, len(train_ds)): 
+    for x in range(0, len(train_ds)):
         print(x)
         returner = train_ds[x]
         _joints = torch.cat([returner['right']['j_pos'],\
@@ -243,7 +248,7 @@ def build_mdm():
 
         _pose = matrix_to_axis_angle(rotation_6d_to_matrix(torch.cat([returner['right']['j_rot'], returner['left']['j_rot']], dim=1)))
         _pose = torch.cat((_pose, torch.zeros(_pose.shape[0], 32, 3)), dim=1)
-        _pose = _pose.view(_pose.shape[0], -1) 
+        _pose = _pose.view(_pose.shape[0], -1)
 
         _num_frames_in_video = _pose.shape[0]
 
@@ -256,5 +261,55 @@ def build_mdm():
 
 
 if __name__ == "__main__":
-    #build_mdm()
-    train_ds = ARCTIC_MDM(args=None, split='train')
+    import numpy as np
+    import rerun as rr  # pip install rerun-sdk
+    import torch
+    import torch.nn.functional as F
+
+    def _load_and_sync_parameters(self):
+        resume_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
+
+        if resume_checkpoint:
+            self.resume_step = parse_resume_step_from_filename(resume_checkpoint)
+            logger.log(f"loading model from checkpoint: {resume_checkpoint}...")
+            self.model.load_state_dict(
+                dist_util.load_state_dict(
+                    resume_checkpoint, map_location=dist_util.dev()
+                )
+            )
+
+
+    def _load_optimizer_state(self):
+        main_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
+        opt_checkpoint = bf.join(
+            bf.dirname(main_checkpoint), f"opt{self.resume_step:09}.pt"
+        )
+        if bf.exists(opt_checkpoint):
+            logger.log(f"loading optimizer state from checkpoint: {opt_checkpoint}")
+            state_dict = dist_util.load_state_dict(
+                opt_checkpoint, map_location=dist_util.dev()
+            )
+            self.opt.load_state_dict(state_dict)
+
+    train_ds = ARCTIC_MDM()
+
+    rr.init("rerun_example_minimal", spawn=True)
+
+    for i in range(len(train_ds)):
+        x = train_ds._joints[i]
+        mod_x = train_ds[i]
+
+        for time in range(x.shape[0]): #-1]):
+            if time % 50 == 0:
+                print(time)
+
+            rr.set_time_sequence("frame", time)
+
+            points = x[time]
+            mod_points = mod_x['inp'][:, :, time] + 0.01
+
+            rr.log(f"orig_vert_{i}", rr.Points3D(points, radii=0.01)) #colors=colors, radii=0.5))
+            rr.log(f"mod_vert_{i}", rr.Points3D(mod_points, radii=0.01)) #colors=colors, radii=0.5))
+
+        if i > 10: break
+
