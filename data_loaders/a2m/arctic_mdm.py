@@ -266,50 +266,43 @@ if __name__ == "__main__":
     import torch
     import torch.nn.functional as F
 
-    def _load_and_sync_parameters(self):
-        resume_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
-
-        if resume_checkpoint:
-            self.resume_step = parse_resume_step_from_filename(resume_checkpoint)
-            logger.log(f"loading model from checkpoint: {resume_checkpoint}...")
-            self.model.load_state_dict(
-                dist_util.load_state_dict(
-                    resume_checkpoint, map_location=dist_util.dev()
-                )
-            )
-
-
-    def _load_optimizer_state(self):
-        main_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
-        opt_checkpoint = bf.join(
-            bf.dirname(main_checkpoint), f"opt{self.resume_step:09}.pt"
-        )
-        if bf.exists(opt_checkpoint):
-            logger.log(f"loading optimizer state from checkpoint: {opt_checkpoint}")
-            state_dict = dist_util.load_state_dict(
-                opt_checkpoint, map_location=dist_util.dev()
-            )
-            self.opt.load_state_dict(state_dict)
-
     train_ds = ARCTIC_MDM()
+    rr.init("rerun_example_pred", spawn=True)
 
-    rr.init("rerun_example_minimal", spawn=True)
-
+    # viz dataset
+    '''
     for i in range(len(train_ds)):
-        x = train_ds._joints[i]
-        mod_x = train_ds[i]
+        x_joints = train_ds._joints[i]
+        x_mdm = train_ds[i]
 
-        for time in range(x.shape[0]): #-1]):
+        for time in range(x_joints.shape[0]): #-1]):
             if time % 50 == 0:
                 print(time)
 
             rr.set_time_sequence("frame", time)
 
-            points = x[time]
-            mod_points = mod_x['inp'][:, :, time] + 0.01
+            this_joints = x_joints[time]
+            this_mdm = x_mdm['inp'][:, :, time] + 0.01
 
-            rr.log(f"orig_vert_{i}", rr.Points3D(points, radii=0.01)) #colors=colors, radii=0.5))
-            rr.log(f"mod_vert_{i}", rr.Points3D(mod_points, radii=0.01)) #colors=colors, radii=0.5))
+            rr.log(f"orig_joints_{i}", rr.Points3D(this_joints, radii=0.01)) #colors=colors, radii=0.5))
+            rr.log(f"mdm_joints_{i}", rr.Points3D(this_mdm, radii=0.01)) #colors=colors, radii=0.5))
 
         if i > 10: break
+    '''
 
+    # viz model 
+    results = np.load('/home/relh/Code/hand_trajectories/third_party/motion-diffusion-model/save/v2/samples_v2_000150000_seed10/results.npy', allow_pickle=True)
+    motion = results.item()['motion']
+
+    for i in range(motion.shape[0]):
+        x_out = motion[i]
+
+        for time in range(x_out.shape[-1]):
+            if time % 50 == 0:
+                print(time)
+
+            rr.set_time_sequence("frame", time)
+            this_out = x_out[:-1, 1:4, time]
+            rr.log(f"pred_joints_{i}", rr.Points3D(this_out, radii=0.01)) #colors=colors, radii=0.5))
+
+        if i > 30: break

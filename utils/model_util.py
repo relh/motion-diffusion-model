@@ -35,8 +35,8 @@ def get_model_args(args, data):
 
     if args.dataset == 'arctic':
         data_rep = 'xyz'
-        njoints = 74 
-        nfeats = 3
+        njoints = 74 # 75
+        nfeats = 3 # 6
         pose_rep = 'xyz'
     elif args.dataset == 'humanml':
         data_rep = 'hml_vec'
